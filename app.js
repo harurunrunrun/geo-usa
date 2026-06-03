@@ -577,11 +577,6 @@ function renderMap() {
     g.append(rect, text, mark);
     g.addEventListener('click', () => answer(s.abbr));
     g.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter') {
-        ev.preventDefault();
-        ev.stopPropagation();
-        return;
-      }
       if (ev.key === ' ') {
         ev.preventDefault();
         ev.stopPropagation();
@@ -861,21 +856,26 @@ window.addEventListener('beforeunload', ev => {
 document.addEventListener('keydown', ev => {
   const active = document.activeElement;
   const tag = active?.tagName;
-  if (tag === 'SELECT' || tag === 'INPUT' || tag === 'BUTTON') return;
+  const dialogOpen = els.giveUpDialog?.open;
+
   if (ev.key === 'Enter') {
-    if (active?.classList?.contains('state-tile')) {
+    if (dialogOpen) return;
+    if (!timeRun.active && current && answered) {
       ev.preventDefault();
-      return;
+      ev.stopPropagation();
+      advanceIfReady();
     }
-    ev.preventDefault();
-    advanceIfReady();
+    return;
   }
+
+  if (dialogOpen || tag === 'SELECT' || tag === 'INPUT' || tag === 'BUTTON') return;
+
   if (ev.key.toLowerCase() === 'h') showHint();
   if (ev.key === '/') {
     ev.preventDefault();
     revealAnswer();
   }
-});
+}, true);
 
 renderMap();
 updateStats();
