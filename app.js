@@ -81,18 +81,28 @@ const els = {
   accuracy: document.getElementById('accuracy'),
   streak: document.getElementById('streak'),
   timeLeft: document.getElementById('timeLeft'),
+  remainingCount: document.getElementById('remainingCount'),
   feedback: document.getElementById('feedback'),
   hintButton: document.getElementById('hintButton'),
   answerButton: document.getElementById('answerButton'),
   nextButton: document.getElementById('nextButton'),
   startTimeAttack: document.getElementById('startTimeAttack'),
+  giveUpButton: document.getElementById('giveUpButton'),
   tweetResult: document.getElementById('tweetResult'),
   resetStreak: document.getElementById('resetStreak'),
   tweetStats: document.getElementById('tweetStats'),
   resetStats: document.getElementById('resetStats'),
+  giveUpDialog: document.getElementById('giveUpDialog'),
+  giveUpDialogTitle: document.getElementById('giveUpDialogTitle'),
+  giveUpDialogText: document.getElementById('giveUpDialogText'),
+  cancelGiveUp: document.getElementById('cancelGiveUp'),
+  confirmGiveUp: document.getElementById('confirmGiveUp'),
+  tweetGiveUp: document.getElementById('tweetGiveUp'),
+  closeGiveUpDialog: document.getElementById('closeGiveUpDialog'),
   regionSelect: document.getElementById('regionSelect'),
   modeSelect: document.getElementById('modeSelect'),
   map: document.getElementById('usTileMap'),
+  shortcutHelp: document.querySelector('.shortcut-help'),
 };
 
 let state = loadState();
@@ -118,7 +128,10 @@ function freshTimeRun() {
     elapsed:0,
     queue:[],
     current:null,
-    finished:false
+    finished:false,
+    gaveUp:false,
+    totalProblems:0,
+    remainingAtEnd:null
   };
 }
 
@@ -276,6 +289,7 @@ function answer(abbr) {
   updateStats();
   showResult(ok, selected);
   updateHighlights(selected.abbr);
+  updateActions();
 }
 
 function recordProgress(code, ok) {
@@ -306,12 +320,19 @@ function buildTimeAttackQueue() {
   return allProblems().sort(() => Math.random() - 0.5);
 }
 
+function getTimeRemaining() {
+  if (timeRun.active) return timeRun.queue.length + (current && !answered ? 1 : 0);
+  if (timeRun.remainingAtEnd !== null) return timeRun.remainingAtEnd;
+  if (timeRun.started) return 0;
+  return '—';
+}
+
 function nextTimeAttackQuestion() {
   if (!timeRun.active) {
     current = null;
     answered = false;
     hintLevel = 0;
-    els.areaCode.textContent = timeRun.finished ? 'Done' : '---';
+    els.areaCode.textContent = timeRun.gaveUp ? 'Give Up' : (timeRun.finished ? 'Done' : '---');
     if (!timeRun.finished) showFeedback('neutral', '');
     updateHighlights();
     updateStats();
@@ -381,6 +402,7 @@ function revealAnswer() {
   updateStats();
   showFeedback('warn', '');
   updateHighlights(current.state.abbr);
+  updateActions();
 }
 
 function showFeedback(type, html) {
@@ -390,13 +412,16 @@ function showFeedback(type, html) {
 
 function updateStats() {
   const timeStat = document.querySelector('.time-stat');
+  const remainingStat = document.querySelector('.remaining-stat');
   if (isTimeMode()) {
     els.correctCount.textContent = timeRun.correct;
     els.totalCount.textContent = timeRun.total;
     els.accuracy.textContent = timeRun.total ? `${Math.round(timeRun.correct / timeRun.total * 100)}%` : '—';
     els.streak.textContent = `${timeRun.streak} / ${timeRun.bestStreak}`;
     els.timeLeft.textContent = formatElapsed(timeRun.elapsed);
+    els.remainingCount.textContent = getTimeRemaining();
     timeStat?.classList.remove('hidden');
+    remainingStat?.classList.remove('hidden');
     return;
   }
   els.correctCount.textContent = state.correct;
@@ -404,17 +429,32 @@ function updateStats() {
   els.accuracy.textContent = state.total ? `${Math.round(state.correct / state.total * 100)}%` : '—';
   els.streak.textContent = `${state.streak} / ${state.best}`;
   timeStat?.classList.add('hidden');
+  remainingStat?.classList.add('hidden');
 }
 
 function updateActions() {
   const time = isTimeMode();
-  els.regionSelect.disabled = time;
+  const runningTimeAttack = timeRun.active;
+  els.regionSelect.disabled = time || runningTimeAttack;
+  els.modeSelect.disabled = runningTimeAttack;
   if (time) els.regionSelect.value = 'all';
   els.hintButton.classList.toggle('hidden', time);
   els.answerButton.classList.toggle('hidden', time);
   els.nextButton.classList.toggle('hidden', time);
+  els.nextButton.disabled = time || !current || !answered;
   els.startTimeAttack.classList.toggle('hidden', !time || timeRun.active);
-  els.tweetResult.classList.toggle('hidden', !(time && timeRun.started && !timeRun.active && timeRun.total > 0));
+  els.giveUpButton.classList.toggle('hidden', !time || !timeRun.active);
+  els.tweetStats.classList.toggle('hidden', time);
+  els.resetStreak.classList.toggle('hidden', time);
+  els.resetStats.classList.toggle('hidden', time);
+  els.tweetResult.classList.add('hidden');
+  els.shortcutHelp?.classList.toggle('hidden', runningTimeAttack);
+}
+
+function advanceIfReady() {
+  if (isTimeMode()) return;
+  if (!current || !answered) return;
+  nextQuestion();
 }
 
 function formatElapsed(ms) {
@@ -537,8 +577,14 @@ function renderMap() {
     g.append(rect, text, mark);
     g.addEventListener('click', () => answer(s.abbr));
     g.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter' || ev.key === ' ') {
+      if (ev.key === 'Enter') {
         ev.preventDefault();
+        ev.stopPropagation();
+        return;
+      }
+      if (ev.key === ' ') {
+        ev.preventDefault();
+        ev.stopPropagation();
         answer(s.abbr);
       }
     });
@@ -613,6 +659,7 @@ function startTimeAttack() {
   timeRun.active = true;
   timeRun.started = true;
   timeRun.queue = buildTimeAttackQueue();
+  timeRun.totalProblems = timeRun.queue.length;
   timeRun.startAt = Date.now();
   timeRun.elapsed = 0;
   showFeedback('neutral', '');
@@ -632,28 +679,145 @@ function endTimeAttack() {
   stopTimeAttackTimer();
   timeRun.active = false;
   timeRun.finished = true;
+  timeRun.gaveUp = false;
   timeRun.elapsed = Date.now() - timeRun.startAt;
+  timeRun.remainingAtEnd = 0;
   current = null;
   answered = true;
-  if (state.timeBest === null || timeRun.elapsed < state.timeBest) state.timeBest = timeRun.elapsed;
+  const isNewBest = state.timeBest === null || timeRun.elapsed < state.timeBest;
+  if (isNewBest) state.timeBest = timeRun.elapsed;
   saveState();
   els.areaCode.textContent = 'Done';
-  const accuracy = timeRun.total ? Math.round(timeRun.correct / timeRun.total * 100) : 0;
-  const best = state.timeBest === timeRun.elapsed ? '<br>New best time' : '';
-  showFeedback('neutral', `Time Attack: <b>${formatElapsed(timeRun.elapsed)}s</b><br>Attempts: <b>${timeRun.total}</b><br>Accuracy: <b>${accuracy}%</b>${best}`);
+  showFeedback('neutral', '');
   updateHighlights();
   updateStats();
   updateActions();
+  openTimeAttackResultDialog(isNewBest);
 }
 
-function tweetResult() {
-  if (!timeRun.started || timeRun.total === 0 || !timeRun.finished) return;
+function timeAttackTweetText() {
   const accuracy = timeRun.total ? Math.round(timeRun.correct / timeRun.total * 100) : 0;
-  const result = `Area Code Quiz Time Attack: ${formatElapsed(timeRun.elapsed)}s, ${timeRun.total} attempts, ${accuracy}% accuracy`;
+  if (timeRun.gaveUp) {
+    const totalProblems = timeRun.totalProblems || (timeRun.correct + getTimeRemaining());
+    const remaining = getTimeRemaining();
+    return `Area Code Quiz Time Attack: gave up after ${formatElapsed(timeRun.elapsed)}s, ${timeRun.correct}/${totalProblems} completed, ${remaining} remaining, ${timeRun.total} attempts, ${accuracy}% accuracy`;
+  }
+  return `Area Code Quiz Time Attack: ${formatElapsed(timeRun.elapsed)}s, ${timeRun.total} attempts, ${accuracy}% accuracy`;
+}
+
+function timeAttackResultRows(isNewBest = false) {
+  const accuracy = timeRun.total ? Math.round(timeRun.correct / timeRun.total * 100) : 0;
+  const totalProblems = timeRun.totalProblems || (timeRun.correct + getTimeRemaining());
+  const remaining = getTimeRemaining();
+  const completed = Math.max(0, totalProblems - (Number.isFinite(remaining) ? remaining : 0));
+  const rows = timeRun.gaveUp
+    ? [
+        ['Status', 'Give Up'],
+        ['Time', `${formatElapsed(timeRun.elapsed)}s`],
+        ['Completed', `${completed}/${totalProblems}`],
+        ['Remaining', `${remaining}`],
+        ['Attempts', `${timeRun.total}`],
+        ['Accuracy', `${accuracy}%`]
+      ]
+    : [
+        ['Status', 'Completed'],
+        ['Time', `${formatElapsed(timeRun.elapsed)}s`],
+        ['Attempts', `${timeRun.total}`],
+        ['Accuracy', `${accuracy}%`]
+      ];
+  if (isNewBest) rows.push(['Best', 'New best time']);
+  return rows;
+}
+
+function setDialogMessage(text) {
+  els.giveUpDialogText.className = 'dialog-message';
+  els.giveUpDialogText.textContent = text;
+}
+
+function setDialogResult(rows) {
+  els.giveUpDialogText.className = 'dialog-message result-summary';
+  els.giveUpDialogText.replaceChildren();
+  for (const [label, value] of rows) {
+    const row = document.createElement('div');
+    row.className = 'result-row';
+    const key = document.createElement('span');
+    key.className = 'result-key';
+    key.textContent = label;
+    const val = document.createElement('strong');
+    val.className = 'result-value';
+    val.textContent = value;
+    row.append(key, val);
+    els.giveUpDialogText.appendChild(row);
+  }
+}
+
+function openTimeAttackResultDialog(isNewBest = false) {
+  els.giveUpDialogTitle.textContent = timeRun.gaveUp ? 'Time Attack stopped' : 'Time Attack completed';
+  setDialogResult(timeAttackResultRows(isNewBest));
+  els.cancelGiveUp.classList.add('hidden');
+  els.confirmGiveUp.classList.add('hidden');
+  els.tweetGiveUp.classList.remove('hidden');
+  els.closeGiveUpDialog.classList.remove('hidden');
+  if (typeof els.giveUpDialog.showModal === 'function' && !els.giveUpDialog.open) {
+    els.giveUpDialog.showModal();
+  }
+}
+
+
+function tweetResult() {
+  if (!timeRun.started || timeRun.active || !(timeRun.finished || timeRun.gaveUp)) return;
+  const result = timeAttackTweetText();
   const url = window.location.href.split('#')[0];
   const text = `${result}\n\n${url}`;
   const intent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
   window.open(intent, '_blank', 'noopener,noreferrer');
+}
+
+function openGiveUpDialog() {
+  if (!timeRun.active) return;
+  els.giveUpDialogTitle.textContent = 'Give up Time Attack?';
+  setDialogMessage('Your current result will be available to tweet.');
+  els.cancelGiveUp.classList.remove('hidden');
+  els.confirmGiveUp.classList.remove('hidden');
+  els.tweetGiveUp.classList.add('hidden');
+  els.closeGiveUpDialog.classList.add('hidden');
+  if (typeof els.giveUpDialog.showModal === 'function') {
+    els.giveUpDialog.showModal();
+  } else if (confirm('Give up Time Attack?')) {
+    giveUpTimeAttack();
+  }
+}
+
+function giveUpTimeAttack() {
+  if (!timeRun.active) return;
+  stopTimeAttackTimer();
+  timeRun.elapsed = Date.now() - timeRun.startAt;
+  timeRun.remainingAtEnd = getTimeRemaining();
+  timeRun.active = false;
+  timeRun.finished = false;
+  timeRun.gaveUp = true;
+  current = null;
+  answered = true;
+  els.areaCode.textContent = 'Give Up';
+  showFeedback('neutral', '');
+  updateHighlights();
+  updateStats();
+  updateActions();
+  openTimeAttackResultDialog(false);
+}
+
+
+function resetTimeAttackToInitial() {
+  stopTimeAttackTimer();
+  timeRun = freshTimeRun();
+  current = null;
+  answered = false;
+  hintLevel = 0;
+  els.areaCode.textContent = '---';
+  showFeedback('neutral', '');
+  updateHighlights();
+  updateStats();
+  updateActions();
 }
 
 function refreshForSettings() {
@@ -670,24 +834,47 @@ function refreshForSettings() {
 
 els.hintButton.addEventListener('click', showHint);
 els.answerButton.addEventListener('click', revealAnswer);
-els.nextButton.addEventListener('click', nextQuestion);
+els.nextButton.addEventListener('click', advanceIfReady);
 els.startTimeAttack.addEventListener('click', startTimeAttack);
+els.giveUpButton.addEventListener('click', openGiveUpDialog);
 els.tweetResult.addEventListener('click', tweetResult);
 els.resetStreak.addEventListener('click', resetStreakStats);
 els.tweetStats.addEventListener('click', tweetStats);
 els.resetStats.addEventListener('click', resetAllStats);
+els.cancelGiveUp.addEventListener('click', () => els.giveUpDialog.close());
+els.confirmGiveUp.addEventListener('click', giveUpTimeAttack);
+els.tweetGiveUp.addEventListener('click', tweetResult);
+els.closeGiveUpDialog.addEventListener('click', () => {
+  els.giveUpDialog.close();
+  resetTimeAttackToInitial();
+});
 els.regionSelect.addEventListener('change', refreshForSettings);
 els.modeSelect.addEventListener('change', refreshForSettings);
 
+
+window.addEventListener('beforeunload', ev => {
+  if (!timeRun.active) return;
+  ev.preventDefault();
+  ev.returnValue = '';
+});
+
 document.addEventListener('keydown', ev => {
-  const tag = document.activeElement?.tagName;
+  const active = document.activeElement;
+  const tag = active?.tagName;
   if (tag === 'SELECT' || tag === 'INPUT' || tag === 'BUTTON') return;
   if (ev.key === 'Enter') {
-    if (isTimeMode() && !timeRun.active) startTimeAttack();
-    else nextQuestion();
+    if (active?.classList?.contains('state-tile')) {
+      ev.preventDefault();
+      return;
+    }
+    ev.preventDefault();
+    advanceIfReady();
   }
   if (ev.key.toLowerCase() === 'h') showHint();
-  if (ev.key === '?') revealAnswer();
+  if (ev.key === '/') {
+    ev.preventDefault();
+    revealAnswer();
+  }
 });
 
 renderMap();

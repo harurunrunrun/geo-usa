@@ -21,6 +21,7 @@
           <div><strong id="accuracy">—</strong><span>Accuracy</span></div>
           <div><strong id="streak">0</strong><span>Streak</span></div>
           <div class="time-stat"><strong id="timeLeft">0.0</strong><span>Time</span></div>
+          <div class="remaining-stat"><strong id="remainingCount">—</strong><span>Remaining</span></div>
         </div>
       </div>
 
@@ -32,6 +33,7 @@
           <button id="tweetStats" type="button" class="tweet-button">Tweet Stats</button>
           <button id="resetStreak" type="button" class="reset-button soft-reset">Reset Streak</button>
           <button id="startTimeAttack" type="button" class="primary hidden">Start</button>
+          <button id="giveUpButton" type="button" class="reset-button soft-reset hidden">Give Up</button>
           <button id="tweetResult" type="button" class="tweet-button hidden">Tweet Result</button>
         </div>
         <div class="select-controls">
@@ -72,6 +74,30 @@
       <svg id="usTileMap" role="group" aria-label="U.S. and Canada tile map"></svg>
     </section>
   </main>
+
+
+  <aside class="shortcut-help" aria-label="Keyboard shortcuts">
+    <div class="shortcut-title">Shortcuts</div>
+    <dl>
+      <div><dt><kbd>H</kbd></dt><dd>Hint</dd></div>
+      <div><dt><kbd>/</kbd></dt><dd>Answer</dd></div>
+      <div><dt><kbd>Enter</kbd></dt><dd>Next</dd></div>
+    </dl>
+  </aside>
+
+
+  <dialog id="giveUpDialog" class="result-dialog" aria-labelledby="giveUpDialogTitle">
+    <div class="dialog-card">
+      <h2 id="giveUpDialogTitle">Give up Time Attack?</h2>
+      <div id="giveUpDialogText" class="dialog-message">Your current result will be available to tweet.</div>
+      <div class="dialog-actions">
+        <button id="cancelGiveUp" type="button">Cancel</button>
+        <button id="confirmGiveUp" type="button" class="reset-button soft-reset">Give Up</button>
+        <button id="tweetGiveUp" type="button" class="tweet-button hidden">Tweet Result</button>
+        <button id="closeGiveUpDialog" type="button" class="hidden">Close</button>
+      </div>
+    </div>
+  </dialog>
 
   <script src="app.js"></script>
 </body>
