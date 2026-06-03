@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>North American Area Code Quiz</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="top-bar" aria-label="Quiz">
+      <div class="title-row">
+        <h1 class="app-title">North American Area Code Quiz</h1>
+        <a class="sources-link" href="sources.html">Sources</a>
+      </div>
+      <div class="question-strip">
+        <div class="area-code" id="areaCode">---</div>
+        <div class="stats" aria-label="Score">
+          <div><strong id="correctCount">0</strong><span>Correct</span></div>
+          <div><strong id="totalCount">0</strong><span>Attempts</span></div>
+          <div><strong id="accuracy">—</strong><span>Accuracy</span></div>
+          <div><strong id="streak">0</strong><span>Streak</span></div>
+          <div class="time-stat"><strong id="timeLeft">0.0</strong><span>Time</span></div>
+        </div>
+      </div>
+
+      <div class="controls-strip" aria-label="Controls">
+        <div class="action-controls">
+          <button id="nextButton" type="button" class="primary">Next</button>
+          <button id="hintButton" type="button">Hint</button>
+          <button id="answerButton" type="button">Answer</button>
+          <button id="tweetStats" type="button" class="tweet-button">Tweet Stats</button>
+          <button id="resetStreak" type="button" class="reset-button soft-reset">Reset Streak</button>
+          <button id="startTimeAttack" type="button" class="primary hidden">Start</button>
+          <button id="tweetResult" type="button" class="tweet-button hidden">Tweet Result</button>
+        </div>
+        <div class="select-controls">
+          <label>
+            Region
+            <select id="regionSelect">
+              <option value="all">All</option>
+              <option value="usa">USA</option>
+              <option value="U.S. territories">U.S. Territories</option>
+              <option value="Canada">Canada</option>
+              <option value="Pacific">Pacific</option>
+              <option value="Mountain">Mountain</option>
+              <option value="Midwest">Midwest</option>
+              <option value="South">South</option>
+              <option value="Northeast">Northeast</option>
+            </select>
+          </label>
+          <label>
+            Mode
+            <select id="modeSelect">
+              <option value="normal">Normal</option>
+              <option value="weak">Weak Priority</option>
+              <option value="review">Review</option>
+              <option value="famous">Famous Numbers</option>
+              <option value="time">Time Attack</option>
+            </select>
+          </label>
+        </div>
+        <div class="utility-controls">
+          <button id="resetStats" type="button" class="reset-button danger-reset">Reset All</button>
+        </div>
+      </div>
+
+      <div id="feedback" class="feedback neutral" aria-live="polite"></div>
+    </section>
+
+    <section class="map-card" aria-label="U.S. and Canada tile map">
+      <svg id="usTileMap" role="group" aria-label="U.S. and Canada tile map"></svg>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
