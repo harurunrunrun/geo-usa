@@ -347,11 +347,9 @@ function answerTimeAttack(abbr) {
   recordTimeAnswer(ok);
 
   if (ok) {
-    showFeedback('good', 'Correct');
     updateHighlights(selected.abbr, true);
   } else {
     timeRun.queue.push(current);
-    showFeedback('bad', 'Wrong');
     updateHighlights(selected.abbr, false);
   }
 
@@ -363,11 +361,7 @@ function answerTimeAttack(abbr) {
 }
 
 function showResult(ok, selected) {
-  const names = correctNames();
-  const body = ok
-    ? `Correct: <b>${names}</b>`
-    : `Selected: <b>${selected.name}</b><br>Answer: <b>${names}</b>`;
-  showFeedback(ok ? 'good' : 'bad', body);
+  showFeedback(ok ? 'good' : 'bad', '');
 }
 
 function showHint() {
@@ -385,7 +379,7 @@ function revealAnswer() {
   state.streak = 0;
   saveState();
   updateStats();
-  showFeedback('warn', `Answer: <b>${correctNames()}</b>`);
+  showFeedback('warn', '');
   updateHighlights(current.state.abbr);
 }
 
@@ -493,6 +487,19 @@ function renderMap() {
   els.map.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
   els.map.innerHTML = '';
 
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  defs.innerHTML = `
+    <pattern id="correctPattern" patternUnits="userSpaceOnUse" width="14" height="14">
+      <rect width="14" height="14" fill="#e7f3fb"></rect>
+      <path d="M-4 14 L14 -4 M0 18 L18 0" stroke="#0072b2" stroke-width="3" opacity="0.55"></path>
+    </pattern>
+    <pattern id="wrongPattern" patternUnits="userSpaceOnUse" width="14" height="14">
+      <rect width="14" height="14" fill="#fae8dc"></rect>
+      <path d="M-4 0 L14 18 M0 -4 L18 14" stroke="#d55e00" stroke-width="3" opacity="0.62"></path>
+    </pattern>
+  `;
+  els.map.appendChild(defs);
+
   for (const s of STATES) {
     const [gx, gy] = s.grid;
     const sideGap = gx > minGx ? 18 : 0;
@@ -521,7 +528,13 @@ function renderMap() {
     if (s.name.length > 22 || lines.length > 2) text.classList.add('tiny');
     addWrappedStateName(text, s.name);
 
-    g.append(rect, text);
+    const mark = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    mark.setAttribute('x', x + tileW - 24);
+    mark.setAttribute('y', y + 25);
+    mark.classList.add('result-mark');
+    mark.setAttribute('aria-hidden', 'true');
+
+    g.append(rect, text, mark);
     g.addEventListener('click', () => answer(s.abbr));
     g.addEventListener('keydown', ev => {
       if (ev.key === 'Enter' || ev.key === ' ') {
@@ -539,11 +552,19 @@ function updateHighlights(selectedAbbr=null, revealCorrect=true) {
   document.querySelectorAll('.state-tile').forEach(tile => {
     const abbr = tile.dataset.abbr;
     const s = STATES.find(x => x.abbr === abbr);
+    const mark = tile.querySelector('.result-mark');
     tile.classList.remove('active-region', 'correct', 'wrong', 'dim');
+    if (mark) mark.textContent = '';
     if (!activeStates.has(abbr)) tile.classList.add('dim');
     if (current && hintLevel > 0 && s && s.region === current.state.region) tile.classList.add('active-region');
-    if (answered && revealCorrect && current && correctSet.has(abbr)) tile.classList.add('correct');
-    if (answered && selectedAbbr && abbr === selectedAbbr && !correctSet.has(selectedAbbr)) tile.classList.add('wrong');
+    if (answered && revealCorrect && current && correctSet.has(abbr)) {
+      tile.classList.add('correct');
+      if (mark) mark.textContent = '✓';
+    }
+    if (answered && selectedAbbr && abbr === selectedAbbr && !correctSet.has(selectedAbbr)) {
+      tile.classList.add('wrong');
+      if (mark) mark.textContent = '×';
+    }
   });
 }
 
